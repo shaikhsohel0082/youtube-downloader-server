@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { spawn, exec } from "child_process";
 import readline from "readline";
-
+import { existsSync } from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -26,16 +26,16 @@ app.use("/downloads", express.static(downloadsDir));
 // Store active downloads
 const activeDownloads = new Map();
 
-exec(
-  "yt-dlp https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  (error, stdout, stderr) => {
-    if (error) {
-      console.error("yt-dlp test failed:", stderr || error.message);
-    } else {
-      console.log("yt-dlp test succeeded:", stdout);
-    }
+exec("./bin/yt-dlp --version", (err, stdout, stderr) => {
+  if (err) {
+    console.error("yt-dlp test failed:", stderr || err.message);
+  } else {
+    console.log("yt-dlp version:", stdout.trim());
   }
-);
+});
+
+console.log("yt-dlp exists:", existsSync(path.join(__dirname, "../bin/yt-dlp")));
+
 
 // Get video info
 const getVideoInfo = (url) => {
