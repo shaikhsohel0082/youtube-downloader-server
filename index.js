@@ -28,6 +28,16 @@ const activeDownloads = new Map();
 
 const ytDlpPath = path.join(__dirname, "bin", "yt-dlp");
 
+
+
+exec("yt-dlp https://www.youtube.com/watch?v=dQw4w9WgXcQ", (error, stdout, stderr) => {
+  if (error) {
+    console.error("yt-dlp test failed:", stderr || error.message);
+  } else {
+    console.log("yt-dlp test succeeded:", stdout);
+  }
+});
+
 // Get video info
 const getVideoInfo = (url) => {
   
@@ -85,7 +95,7 @@ app.post("/api/download", async (req, res) => {
     const downloadId = Date.now().toString();
     const outputTemplate = path.join(downloadsDir, "%(title)s.%(ext)s");
 
-    let args = ["--no-playlist", "-o", outputTemplate];
+    let args = ["--no-playlist", "-o", outputTemplate,"--no-check-certificate"];
 
     if (format === "mp3") {
       args.push("--extract-audio", "--audio-format", "mp3");
