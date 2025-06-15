@@ -26,23 +26,21 @@ app.use("/downloads", express.static(downloadsDir));
 // Store active downloads
 const activeDownloads = new Map();
 
-const ytDlpPath = path.join(__dirname, "bin", "yt-dlp");
-
-
-
-exec("yt-dlp https://www.youtube.com/watch?v=dQw4w9WgXcQ", (error, stdout, stderr) => {
-  if (error) {
-    console.error("yt-dlp test failed:", stderr || error.message);
-  } else {
-    console.log("yt-dlp test succeeded:", stdout);
+exec(
+  "yt-dlp https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  (error, stdout, stderr) => {
+    if (error) {
+      console.error("yt-dlp test failed:", stderr || error.message);
+    } else {
+      console.log("yt-dlp test succeeded:", stdout);
+    }
   }
-});
+);
 
 // Get video info
 const getVideoInfo = (url) => {
-  
   return new Promise((resolve, reject) => {
-    exec(`"${ytDlpPath}" -j "${url}"`, (error, stdout, stderr) => {
+    exec(`./bin/yt-dlp -j "${url}"`, (error, stdout, stderr) => {
       if (error) return reject(stderr || error.message);
       try {
         const info = JSON.parse(stdout);
@@ -95,7 +93,12 @@ app.post("/api/download", async (req, res) => {
     const downloadId = Date.now().toString();
     const outputTemplate = path.join(downloadsDir, "%(title)s.%(ext)s");
 
-    let args = ["--no-playlist", "-o", outputTemplate,"--no-check-certificate"];
+    let args = [
+      "--no-playlist",
+      "-o",
+      outputTemplate,
+      "--no-check-certificate",
+    ];
 
     if (format === "mp3") {
       args.push("--extract-audio", "--audio-format", "mp3");
@@ -115,7 +118,8 @@ app.post("/api/download", async (req, res) => {
       filename: null,
     });
 
-    const process = spawn(ytDlpPath, args);
+    const process = spawn("./bin/yt-dlp", args);
+
     const rl = readline.createInterface({ input: process.stdout });
 
     rl.on("line", (line) => {
@@ -215,7 +219,6 @@ app.delete("/api/downloads", async (req, res) => {
   }
 });
 
-
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "YouTube Downloader API is running" });
@@ -224,7 +227,6 @@ app.get("/api/health", (req, res) => {
 app.get("/", (req, res) => {
   res.send("<h1>Welcome to backend server</h1>");
 });
-
 
 // Start server
 app.listen(PORT, () => {
