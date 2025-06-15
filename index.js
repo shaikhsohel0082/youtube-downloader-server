@@ -7,6 +7,7 @@ import { dirname } from "path";
 import { spawn, exec } from "child_process";
 import readline from "readline";
 import { existsSync } from "fs";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -16,33 +17,34 @@ const PORT = process.env.PORT || 3032;
 app.use(cors());
 app.use(express.json());
 
-// Create downloads directory
-const downloadsDir = path.join(__dirname, "../downloads");
+const downloadsDir = path.join(__dirname, "downloads");
 await fs.ensureDir(downloadsDir);
+
 const ytDlpPath = path.join(__dirname, "bin", "yt-dlp");
 
-// Serve static files
-app.use("/downloads", express.static(downloadsDir));
-
-// Store active downloads
-const activeDownloads = new Map();
+console.log("Using yt-dlp path:", ytDlpPath);
+console.log("yt-dlp exists:", existsSync(ytDlpPath));
 
 exec(`${ytDlpPath} --version`, (err, stdout, stderr) => {
   if (err) {
-    console.error("yt-dlp test failed:", stderr || err.message);
+    console.error("yt-dlp version check failed:", stderr || err.message);
   } else {
     console.log("yt-dlp version:", stdout.trim());
   }
 });
 
-console.log("yt-dlp exists:", existsSync(path.join(__dirname, "../bin/yt-dlp")));
+app.use("/downloads", express.static(downloadsDir));
 
+const activeDownloads = new Map();
 
 // Get video info
 const getVideoInfo = (url) => {
   return new Promise((resolve, reject) => {
-    exec(`${ytDlpPath} -j "${url}"`, (error, stdout, stderr) => {
-      if (error) return reject(stderr || error.message);
+    exec(`${ytDlpPath} --dump-json "${url}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error("yt-dlp error:", stderr || error.message);
+        return reject(stderr || error.message);
+      }
       try {
         const info = JSON.parse(stdout);
         resolve(info);
@@ -53,31 +55,27 @@ const getVideoInfo = (url) => {
   });
 };
 
-// Video info endpoint
 app.post("/api/video-info", async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: "URL is required" });
 
     const metadata = await getVideoInfo(url);
-
     const videoInfo = {
       id: metadata.id,
       title: metadata.title,
       thumbnail: metadata.thumbnail,
       duration: metadata.duration,
       uploader: metadata.uploader,
-      formats:
-        metadata.formats?.map((f) => ({
-          format_id: f.format_id,
-          ext: f.ext,
-          quality: f.format_note,
-          filesize: f.filesize,
-          vcodec: f.vcodec,
-          acodec: f.acodec,
-        })) || [],
+      formats: (metadata.formats || []).map(f => ({
+        format_id: f.format_id,
+        ext: f.ext,
+        quality: f.format_note,
+        filesize: f.filesize,
+        vcodec: f.vcodec,
+        acodec: f.acodec,
+      }))
     };
-
     res.json(videoInfo);
   } catch (err) {
     console.error("Error:", err);
@@ -85,7 +83,6 @@ app.post("/api/video-info", async (req, res) => {
   }
 });
 
-// Download endpoint
 app.post("/api/download", async (req, res) => {
   try {
     const { url, format, quality } = req.body;
@@ -94,18 +91,11 @@ app.post("/api/download", async (req, res) => {
     const downloadId = Date.now().toString();
     const outputTemplate = path.join(downloadsDir, "%(title)s.%(ext)s");
 
-    let args = [
-      "--no-playlist",
-      "-o",
-      outputTemplate,
-      "--no-check-certificate",
-    ];
+    let args = ["--no-playlist", "-o", outputTemplate, "--no-check-certificate"];
 
     if (format === "mp3") {
       args.push("--extract-audio", "--audio-format", "mp3");
-      if (quality) {
-        args.push("--audio-quality", quality.replace("kbps", ""));
-      }
+      if (quality) args.push("--audio-quality", quality.replace("kbps", ""));
     } else {
       const height = parseInt(quality?.replace("p", "")) || 720;
       args.push("--format", `bestvideo[height<=${height}]+bestaudio/best`);
@@ -119,8 +109,7 @@ app.post("/api/download", async (req, res) => {
       filename: null,
     });
 
-    const process =spawn(ytDlpPath, args)
-
+    const process = spawn(ytDlpPath, args);
     const rl = readline.createInterface({ input: process.stdout });
 
     rl.on("line", (line) => {
@@ -174,7 +163,6 @@ app.post("/api/download", async (req, res) => {
   }
 });
 
-// Download progress
 app.get("/api/download/:id/progress", (req, res) => {
   const { id } = req.params;
   const info = activeDownloads.get(id);
@@ -182,7 +170,6 @@ app.get("/api/download/:id/progress", (req, res) => {
   res.json(info);
 });
 
-// List downloaded files
 app.get("/api/downloads", async (req, res) => {
   try {
     const files = await fs.readdir(downloadsDir);
@@ -204,15 +191,10 @@ app.get("/api/downloads", async (req, res) => {
   }
 });
 
-// Delete all downloaded files
 app.delete("/api/downloads", async (req, res) => {
   try {
     const files = await fs.readdir(downloadsDir);
-
-    await Promise.all(
-      files.map((file) => fs.unlink(path.join(downloadsDir, file)))
-    );
-
+    await Promise.all(files.map((file) => fs.unlink(path.join(downloadsDir, file))));
     res.status(200).json({ message: "All downloaded files deleted." });
   } catch (err) {
     console.error("Delete error:", err);
@@ -220,7 +202,6 @@ app.delete("/api/downloads", async (req, res) => {
   }
 });
 
-// Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "YouTube Downloader API is running" });
 });
@@ -229,8 +210,7 @@ app.get("/", (req, res) => {
   res.send("<h1>Welcome to backend server</h1>");
 });
 
-// Start server
 app.listen(PORT, () => {
-  console.log(` Server running: http://localhost:${PORT}`);
-  console.log(` Downloads saved to: ${downloadsDir}`);
+  console.log(`Server running: http://localhost:${PORT}`);
+  console.log(`Downloads saved to: ${downloadsDir}`);
 });
