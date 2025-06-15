@@ -27,6 +27,7 @@ app.use("/downloads", express.static(downloadsDir));
 const activeDownloads = new Map();
 
 const ytDlpPath = path.join(__dirname, "../bin/yt-dlp");
+
 // Get video info
 const getVideoInfo = (url) => {
   
