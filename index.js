@@ -26,10 +26,12 @@ app.use("/downloads", express.static(downloadsDir));
 // Store active downloads
 const activeDownloads = new Map();
 
+const ytDlpPath = path.join(__dirname, "../bin/yt-dlp");
 // Get video info
 const getVideoInfo = (url) => {
+  
   return new Promise((resolve, reject) => {
-    exec(`yt-dlp -j "${url}"`, (error, stdout, stderr) => {
+    exec(`"${ytDlpPath}" -j "${url}"`, (error, stdout, stderr) => {
       if (error) return reject(stderr || error.message);
       try {
         const info = JSON.parse(stdout);
@@ -102,7 +104,7 @@ app.post("/api/download", async (req, res) => {
       filename: null,
     });
 
-    const process = spawn("yt-dlp", args);
+    const process = spawn(ytDlpPath, args);
     const rl = readline.createInterface({ input: process.stdout });
 
     rl.on("line", (line) => {
