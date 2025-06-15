@@ -19,6 +19,7 @@ app.use(express.json());
 // Create downloads directory
 const downloadsDir = path.join(__dirname, "../downloads");
 await fs.ensureDir(downloadsDir);
+const ytDlpPath = path.join(__dirname, "bin", "yt-dlp");
 
 // Serve static files
 app.use("/downloads", express.static(downloadsDir));
@@ -26,7 +27,7 @@ app.use("/downloads", express.static(downloadsDir));
 // Store active downloads
 const activeDownloads = new Map();
 
-exec("./bin/yt-dlp --version", (err, stdout, stderr) => {
+exec(`${ytDlpPath} --version`, (err, stdout, stderr) => {
   if (err) {
     console.error("yt-dlp test failed:", stderr || err.message);
   } else {
@@ -40,7 +41,7 @@ console.log("yt-dlp exists:", existsSync(path.join(__dirname, "../bin/yt-dlp")))
 // Get video info
 const getVideoInfo = (url) => {
   return new Promise((resolve, reject) => {
-    exec(`./bin/yt-dlp -j "${url}"`, (error, stdout, stderr) => {
+    exec(`${ytDlpPath} -j "${url}"`, (error, stdout, stderr) => {
       if (error) return reject(stderr || error.message);
       try {
         const info = JSON.parse(stdout);
@@ -118,7 +119,7 @@ app.post("/api/download", async (req, res) => {
       filename: null,
     });
 
-    const process = spawn("./bin/yt-dlp", args);
+    const process =spawn(ytDlpPath, args)
 
     const rl = readline.createInterface({ input: process.stdout });
 
